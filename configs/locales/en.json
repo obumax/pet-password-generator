@@ -1,0 +1,11 @@
+{
+  "length_out_of_range":     "password length must be between {{.Min}} and {{.Max}} characters",
+  "no_category_selected":    "please select at least one character category",
+  "start_choose_language":   "Choose language",
+  "start_greeting":          "Welcome! I am a password generator bot.",
+  "start_commands":          "Use /generate to create a new password.",
+  "prompt_length":           "Please specify password length ({{.Min}}–{{.Max}}):",
+  "prompt_flags":            "Select character sets for your password:",
+  "generation_success":      "Your password: {{.Password}}",
+  "unknown_command":         "Unrecognized command, please press /start"
+}

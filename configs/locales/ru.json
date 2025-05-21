@@ -1,0 +1,11 @@
+{
+  "length_out_of_range":     "длина пароля должна быть от {{.Min}} до {{.Max}} символов",
+  "no_category_selected":    "выберите хотя бы одну категорию символов",
+  "start_choose_language":   "Выберите язык",
+  "start_greeting":          "Добро пожаловать! Я бот-генератор паролей.",
+  "start_commands":          "Используйте /generate, чтобы создать новый пароль.",
+  "prompt_length":           "Укажите длину пароля ({{.Min}}–{{.Max}}):",
+  "prompt_flags":            "Выберите категории символов для пароля:",
+  "generation_success":      "Ваш пароль: {{.Password}}",
+  "unknown_command":         "Команда не распознана, нажмите /start"
+}
