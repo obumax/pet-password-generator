@@ -76,11 +76,16 @@ func handleCallback(bot *tgbotapi.BotAPI, cq *tgbotapi.CallbackQuery) {
 	}
 	lang := parts[1]
 	chatID := cq.Message.Chat.ID
+
+	// save language selection
 	if err := session.SetLang(chatID, lang); err != nil {
 		log.Printf("SetLang error: %v", err)
 	}
+
+	// response to callback to remove the "loading"
 	bot.Request(tgbotapi.NewCallback(cq.ID, ""))
 
+	// sending already localized greeting and command list
 	loc := i18n.Localizer(lang)
 	sendLocalized(bot, chatID, loc, "start_greeting", nil)
 	sendLocalized(bot, chatID, loc, "start_commands", nil)
@@ -88,6 +93,8 @@ func handleCallback(bot *tgbotapi.BotAPI, cq *tgbotapi.CallbackQuery) {
 
 func handleMessage(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
 	chatID := msg.Chat.ID
+
+	// get or install the default locale
 	lang := session.GetLang(chatID)
 	if lang == "" {
 		lang = "en"
@@ -98,11 +105,34 @@ func handleMessage(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
 	if !msg.IsCommand() {
 		return
 	}
+
 	switch msg.Command() {
 	case "start":
-		sendLocalized(bot, chatID, loc, "start_choose_language", nil)
+		// assembling an inline keyboard
+		title, err := loc.Localize(&goi18n.LocalizeConfig{
+			MessageID: "start_choose_language",
+		})
+		if err != nil {
+			log.Printf("loc err %q: %v", "start_choose_language", err)
+			title = "Choose language"
+		}
+
+		keyboard := tgbotapi.NewInlineKeyboardMarkup(
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("🇬🇧 English", "lang:en"),
+				tgbotapi.NewInlineKeyboardButtonData("🇷🇺 Русский", "lang:ru"),
+			),
+		)
+
+		out := tgbotapi.NewMessage(chatID, title)
+		out.ReplyMarkup = keyboard
+		if _, err := bot.Send(out); err != nil {
+			log.Printf("send start keyboard err: %v", err)
+		}
+
 	case "generate":
 		handleGenerate(bot, chatID, msg.CommandArguments(), loc)
+
 	default:
 		sendLocalized(bot, chatID, loc, "unknown_command", nil)
 	}
