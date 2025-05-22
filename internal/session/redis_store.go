@@ -9,10 +9,8 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-var (
-	// ErrNotFound is returned if there is no state in Redis for the given chatID
-	ErrNotFound = fmt.Errorf("session not found")
-)
+// ErrNotFound is returned if there is no state in Redis for the given chatID
+var ErrNotFound = fmt.Errorf("session not found")
 
 // RedisStore stores sessions in Redis
 type RedisStore struct {
@@ -53,7 +51,6 @@ func (r *RedisStore) Get(chatID int64) (*Session, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	var sess Session
 	if err := json.Unmarshal([]byte(data), &sess); err != nil {
 		return nil, err

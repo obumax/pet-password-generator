@@ -1,66 +1,43 @@
 package session
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
 	"github.com/go-redis/redismock/v9"
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestRedisStoreGetSet(t *testing.T) {
+func TestRedisStoreGetSetDelete(t *testing.T) {
 	client, mock := redismock.NewClientMock()
 	store := &RedisStore{
 		client: client,
-		prefix: "session",
+		prefix: "session:",
 		ttl:    24 * time.Hour,
 	}
-
 	chatID := int64(12345)
 	key := store.key(chatID)
 
-	sess := &Session{
-		ChatID:     chatID,
-		Language:   "ru",
-		State:      "init",
-		LastActive: time.Now(),
-	}
-
-	// Mock Get(redis.Nil - session not found)
+	// Get → not found
 	mock.ExpectGet(key).RedisNil()
 	_, err := store.Get(chatID)
 	assert.Equal(t, ErrNotFound, err)
 
-	// Mock Set and Get
-	mock.ExpectSet(key, gomock.Any(), store.ttl).SetVal("OK")
-	mock.ExpectGet(key).SetVal(`{"chat_id":12345,"language":"ru","state":"init","last_active":"` + sess.LastActive.Format(time.RFC3339Nano) + `"}`)
-	err = store.Set(chatID, sess)
-	assert.NoError(t, err)
+	// Set + Get
+	sess := &Session{ChatID: chatID, Language: "ru", State: "init", LastActive: time.Now()}
+	buf, _ := json.Marshal(sess)
+	mock.ExpectSet(key, buf, store.ttl).SetVal("OK")
+	mock.ExpectGet(key).SetVal(string(buf))
 
+	assert.NoError(t, store.Set(chatID, sess))
 	got, err := store.Get(chatID)
 	assert.NoError(t, err)
-	assert.NotNil(t, got)
-	assert.Equal(t, "ru", got.Language)
-	assert.Equal(t, chatID, got.ChatID)
+	assert.Equal(t, sess.Language, got.Language)
 
-	// Check that the mock calls were made
-	assert.NoError(t, mock.ExpectationsWereMet())
-}
-
-func TestRedisStoreDelete(t *testing.T) {
-	client, mock := redismock.NewClientMock()
-	store := &RedisStore{
-		client: client,
-		prefix: "session",
-		ttl:    24 * time.Hour,
-	}
-
-	chatID := int64(12345)
-	key := store.key(chatID)
-
+	// Delete
 	mock.ExpectDel(key).SetVal(1)
-	err := store.Delete(chatID)
-	assert.NoError(t, err)
+	assert.NoError(t, store.Delete(chatID))
+
 	assert.NoError(t, mock.ExpectationsWereMet())
 }

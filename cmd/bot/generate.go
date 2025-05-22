@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"strconv"
 	"strings"
 
@@ -16,8 +17,6 @@ const (
 	maxLen = 35
 )
 
-// handleGenerate parses the arguments, calls generator.Generate,
-// localizes the error or success and sends the response
 func handleGenerate(
 	bot *tgbotapi.BotAPI,
 	chatID int64,
@@ -26,22 +25,21 @@ func handleGenerate(
 ) {
 	parts := strings.Fields(args)
 	if len(parts) < 2 {
-		// Hint on using the command
-		usage := mustLocalize(loc, "prompt_length", map[string]interface{}{"Min": minLen, "Max": maxLen}) + "\n" +
-			mustLocalize(loc, "prompt_flags", nil) + "\n" +
-			"/generate 12 ULDSX"
-		bot.Send(tgbotapi.NewMessage(chatID, usage))
+		sendLocalized(bot, chatID, loc, "prompt_length", map[string]interface{}{
+			"Min": minLen, "Max": maxLen,
+		})
+		sendLocalized(bot, chatID, loc, "prompt_flags", nil)
 		return
 	}
 
-	// 1) Parse the length
 	length, err := strconv.Atoi(parts[0])
-	if err != nil {
-		bot.Send(tgbotapi.NewMessage(chatID, mustLocalize(loc, "unknown_command", nil)))
+	if err != nil || length < minLen || length > maxLen {
+		sendLocalized(bot, chatID, loc, "prompt_length", map[string]interface{}{
+			"Min": minLen, "Max": maxLen,
+		})
 		return
 	}
 
-	// 2) flags
 	var flags generator.FlagsSet
 	for _, c := range parts[1] {
 		switch c {
@@ -57,19 +55,23 @@ func handleGenerate(
 			flags.ExcludeSimilar = true
 		}
 	}
-
-	// 3) Generate a password
-	pass, err := generator.Generate(length, flags)
-	if err != nil {
-		text := i18nutil.LocalizeError(loc, err, map[string]interface{}{
-			"Min": minLen,
-			"Max": maxLen,
-		})
-		bot.Send(tgbotapi.NewMessage(chatID, text))
+	if !flags.HasAny() {
+		sendLocalized(bot, chatID, loc, "prompt_flags", nil)
 		return
 	}
 
-	// 4) Success
-	success := mustLocalize(loc, "generation_success", map[string]interface{}{"Password": pass})
-	bot.Send(tgbotapi.NewMessage(chatID, success))
+	pass, err := generator.Generate(length, flags)
+	if err != nil {
+		text := i18nutil.MapError(loc, err, map[string]interface{}{
+			"Min": minLen, "Max": maxLen,
+		})
+		if _, e := bot.Send(tgbotapi.NewMessage(chatID, text)); e != nil {
+			log.Printf("send err: %v", e)
+		}
+		return
+	}
+
+	sendLocalized(bot, chatID, loc, "generation_success", map[string]interface{}{
+		"Password": pass,
+	})
 }

@@ -3,43 +3,50 @@ package i18n
 import (
 	"embed"
 	"encoding/json"
+	"fmt"
+	"io/fs"
 	"log"
 
-	"github.com/nicksnyder/go-i18n/v2/i18n"
+	goi18n "github.com/nicksnyder/go-i18n/v2/i18n"
 	"golang.org/x/text/language"
 )
 
-//go:embed ../../configs/locales/*.json
-var localeFS embed.FS
+var (
+	//go:embed locales/*.json
+	localeFS embed.FS
 
-var bundle *i18n.Bundle
+	bundle *goi18n.Bundle
+)
 
-// InitBundle загружает все JSON-файлы локалей из configs/locales
-// InitBundle loads all locale JSON files from configs/locales
-func InitBundle() {
-	bundle = i18n.NewBundle(language.English)
+// InitBundle creates a Bundle with a fallback in English,
+// Registers a JSON parser and loads all locales/*.json files
+func InitBundle() error {
+	bundle = goi18n.NewBundle(language.English)
 	bundle.RegisterUnmarshalFunc("json", json.Unmarshal)
 
-	files, err := localeFS.ReadDir("configs/locales")
+	files, err := fs.Glob(localeFS, "locales/*.json")
 	if err != nil {
-		log.Fatalf("i18n: cannot read locales dir: %v", err)
+		return fmt.Errorf("i18n: glob locale files: %w", err)
 	}
-	for _, f := range files {
-		data, err := localeFS.ReadFile("configs/locales/" + f.Name())
+	for _, file := range files {
+		data, err := localeFS.ReadFile(file)
 		if err != nil {
-			log.Fatalf("i18n: cannot read %s: %v", f.Name(), err)
+			return fmt.Errorf("i18n: read %s: %w", file, err)
 		}
-		if _, err := bundle.ParseMessageFileBytes(data, f.Name()); err != nil {
-			log.Fatalf("i18n: parse %s failed: %v", f.Name(), err)
+		if _, err := bundle.ParseMessageFileBytes(data, file); err != nil {
+			return fmt.Errorf("i18n: parse %s: %w", file, err)
 		}
 	}
+	return nil
 }
 
-// Localizer возвращает локализатор для данного языка (например, "ru" или "en")
-// Localizer returns the localizer for the given language (for example, "ru" or "en")
-func Localizer(lang string) *i18n.Localizer {
+// Localizer returns the localizer for the specified code (for example, "en" or "ru")
+func Localizer(lang string) *goi18n.Localizer {
 	if bundle == nil {
-		InitBundle()
+		log.Println("i18n: bundle not initialized, initializing")
+		if err := InitBundle(); err != nil {
+			log.Fatalf("i18n: InitBundle failed: %v", err)
+		}
 	}
-	return i18n.NewLocalizer(bundle, lang)
+	return goi18n.NewLocalizer(bundle, lang)
 }

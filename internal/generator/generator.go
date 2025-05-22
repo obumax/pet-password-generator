@@ -15,6 +15,11 @@ type FlagsSet struct {
 	Upper, Lower, Digits, SpecSymbols, ExcludeSimilar bool
 }
 
+// HasAny returns true if at least one of the flags is selected (except ExcludeSimilar)
+func (f FlagsSet) HasAny() bool {
+	return f.Upper || f.Lower || f.Digits || f.SpecSymbols
+}
+
 // Categories of symbols
 const (
 	ups       = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -24,11 +29,11 @@ const (
 	similars  = "il1O0"
 )
 
-// Generate creates a password length from 4 to 35 characters
+// Generate creates a password length from 4 to 35 symbols
 // each selected category occurs ≥1 time
 // at least 1 flag must be selected (true)
-func Generate(lenght int, flags FlagsSet) (string, error) {
-	if lenght < 4 || lenght > 35 {
+func Generate(length int, flags FlagsSet) (string, error) {
+	if length < 4 || length > 35 {
 		return "", ErrLengthOutOfRange
 	}
 	// Building a pool of symbols and categories
@@ -36,53 +41,75 @@ func Generate(lenght int, flags FlagsSet) (string, error) {
 	var required [][]rune
 
 	if flags.Upper {
-		required = append(required, []rune(ups))
-		pool = append(pool, []rune(ups)...)
+		runes := []rune(ups)
+		required = append(required, runes)
+		pool = append(pool, runes...)
 	}
 	if flags.Lower {
-		required = append(required, []rune(lows))
-		pool = append(pool, []rune(lows)...)
+		runes := []rune(lows)
+		required = append(required, runes)
+		pool = append(pool, runes...)
 	}
 	if flags.Digits {
-		required = append(required, []rune(digs))
-		pool = append(pool, []rune(digs)...)
+		runes := []rune(digs)
+		required = append(required, runes)
+		pool = append(pool, runes...)
 	}
 	if flags.SpecSymbols {
-		required = append(required, []rune(specSymbs))
-		pool = append(pool, []rune(specSymbs)...)
+		runes := []rune(specSymbs)
+		required = append(required, runes)
+		pool = append(pool, runes...)
 	}
 	if len(required) == 0 {
 		return "", ErrNoCategorySelected
 	}
+	if len(required) > length {
+		return "", ErrLengthOutOfRange
+	}
 
 	// Remove similar characters if flag is set
 	if flags.ExcludeSimilar {
-		filtered := pool[:0]
+		fp := make([]rune, 0, len(pool))
 		for _, r := range pool {
 			if !containsRune(similars, r) {
-				filtered = append(filtered, r)
+				fp = append(fp, r)
 			}
 		}
-		pool = filtered
+		pool = fp
+		for i, cat := range required {
+			fc := make([]rune, 0, len(cat))
+			for _, r := range cat {
+				if !containsRune(similars, r) {
+					fc = append(fc, r)
+				}
+			}
+			required[i] = fc
+		}
 	}
 
 	// Password assembly
-	password := make([]rune, lenght)
+	password := make([]rune, length)
 
 	// First, one symbol is taken from each category
 	// 4 categories = 4 symbols minimum one per category
 	for i, cat := range required {
-		index, _ := rand.Int(rand.Reader, big.NewInt(int64(len(cat))))
-		password[i] = cat[index.Int64()]
+		idxBig, err := rand.Int(rand.Reader, big.NewInt(int64(len(cat))))
+		if err != nil {
+			return "", err
+		}
+		password[i] = cat[idxBig.Int64()]
 	}
 
 	// The remaining symbols are taken from the general pool
-	for i := len(required); i < lenght; i++ {
-		index, _ := rand.Int(rand.Reader, big.NewInt(int64(len(pool))))
-		password[i] = pool[index.Int64()]
+	for i := len(required); i < length; i++ {
+		idxBig, err := rand.Int(rand.Reader, big.NewInt(int64(len(pool))))
+		if err != nil {
+			return "", err
+		}
+		password[i] = pool[idxBig.Int64()]
 	}
 
-	// Mix the symbols
+	// shuffle the symbols
 	mix(password)
 	return string(password), nil
 }
@@ -101,7 +128,10 @@ func containsRune(s string, r rune) bool {
 func mix(runes []rune) {
 	n := len(runes)
 	for i := n - 1; i > 0; i-- {
-		jBig, _ := rand.Int(rand.Reader, big.NewInt(int64(i+1)))
+		jBig, err := rand.Int(rand.Reader, big.NewInt(int64(i+1)))
+		if err != nil {
+			continue
+		}
 		j := int(jBig.Int64())
 		runes[i], runes[j] = runes[j], runes[i]
 	}
