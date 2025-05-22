@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/joho/godotenv"
 	goi18n "github.com/nicksnyder/go-i18n/v2/i18n"
 	"github.com/redis/go-redis/v9"
 
@@ -14,7 +15,12 @@ import (
 	"github.com/obumax/pet-password-generator/internal/session"
 )
 
+func init() {
+	_ = godotenv.Load() // .env
+}
+
 func main() {
+
 	// Localization
 	if err := i18n.InitBundle(); err != nil {
 		log.Fatalf("i18n init failed: %v", err)
